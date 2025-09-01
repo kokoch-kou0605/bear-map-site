@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>クママップサイト</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <div class="container">
+        <audio id="bear-sound" src="{{ url_for('static', filename='bear_sound.mp3') }}"></audio>
+
+        <div id="g_id_onload"
+             data-client_id="{{ CLIENT_ID }}"
+             data-callback="handleCredentialResponse">
+        </div>
+
+        <div class="auth-buttons">
+            <div class="g_id_signin" data-type="standard" data-size="large"></div>
+            <button id="logout-button" style="display: none;">ログアウト</button>
+        </div>
+        
+        <div id="tab1-content" class="tab-content active">
+            <h2>クマ発見マップ(Ver.1.0.2)</h2>
+            <div id="map"></div>
+            <div class="button-group">
+                <button id="report-current-location-button" disabled>現在地を通報する</button>
+                <button id="report-map-center-button" disabled>地図の中心を通報する</button>
+                <button id="sound-button">音を鳴らす</button>
+            </div>
+            <p id="report-message">サインインして通報を開始してください。</p>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
