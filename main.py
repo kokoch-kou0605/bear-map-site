@@ -10,7 +10,7 @@ from google.auth.transport import requests as google_requests
 app = Flask(__name__)
 app.secret_key = 'a_very_long_and_random_string_that_no_one_can_guess_12345'
 
-CLIENT_ID = "395791546336-abvueujtrcv7mfmm1bhid5o2ogi74ep9.apps.googleusercontent.com"
+CLIENT_ID = "395791546336-ll8vrl97u6iar765t6mg4i7i2ut4d3du.apps.googleusercontent.com"
 
 DATA_FILE = "data.json"
 tf = TimezoneFinder()
