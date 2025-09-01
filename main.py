@@ -6,24 +6,28 @@ from timezonefinder import TimezoneFinder
 import pytz
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import os
 
 app = Flask(__name__)
 app.secret_key = 'a_very_long_and_random_string_that_no_one_can_guess_12345'
 
 CLIENT_ID = "395791546336-ll8vrl97u6iar765t6mg4i7i2ut4d3du.apps.googleusercontent.com"
 
-DATA_FILE = "data.json"
+# data.jsonのパスを/tmpディレクトリに設定
+DATA_FILE_PATH = os.path.join('/tmp', 'data.json')
 tf = TimezoneFinder()
 
 def load_data():
     try:
-        with open(DATA_FILE, 'r') as f:
+        # /tmp/data.jsonからデータを読み込む
+        with open(DATA_FILE_PATH, 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
 def save_data(data):
-    with open(DATA_FILE, 'w') as f:
+    # /tmp/data.jsonにデータを書き込む
+    with open(DATA_FILE_PATH, 'w') as f:
         json.dump(data, f, indent=4)
 
 def get_local_time(lat, lng):
