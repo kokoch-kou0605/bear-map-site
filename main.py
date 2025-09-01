@@ -17,6 +17,10 @@ CLIENT_ID = "395791546336-ll8vrl97u6iar765t6mg4i7i2ut4d3du.apps.googleuserconten
 DATA_FILE_PATH = os.path.join('/tmp', 'data.json')
 tf = TimezoneFinder()
 
+# 管理者のユーザーIDをここに設定してください
+# 一度ログインしてログから取得した'sub'フィールドの値を貼り付けます
+ADMIN_USER_ID = "ここに管理者IDを貼り付け"
+
 def load_data():
     try:
         # /tmp/data.jsonからデータを読み込む
@@ -56,6 +60,9 @@ def login():
     try:
         idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
         session['user_id'] = idinfo['sub']
+        # デバッグ用: ユーザーIDとメールアドレスをログに出力
+        print("Logged in user ID:", idinfo.get('sub'))
+        print("Logged in user email:", idinfo.get('email'))
         return jsonify({"success": True})
     except ValueError:
         return jsonify({"success": False, "error": "Invalid token"}), 400
@@ -104,13 +111,17 @@ def delete_location(location_id):
     # DELETEリクエスト（削除）はログインが必要
     if 'user_id' not in session:
         return jsonify({"error": "Unauthorized"}), 401
+    
+    # 管理者かどうかのチェック
+    is_admin = session['user_id'] == ADMIN_USER_ID
 
     locations = load_data()
     
     index_to_delete = -1
     for i, location in enumerate(locations):
         if location.get('id') == location_id:
-            if location.get('user_id') == session['user_id']:
+            # 管理者の場合は、誰の通報でも削除可能
+            if is_admin or location.get('user_id') == session['user_id']:
                 index_to_delete = i
                 break
             else:
