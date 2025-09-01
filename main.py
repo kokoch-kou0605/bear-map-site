@@ -19,7 +19,7 @@ tf = TimezoneFinder()
 
 # 管理者のユーザーIDをここに設定してください
 # 一度ログインしてログから取得した'sub'フィールドの値を貼り付けます
-ADMIN_USER_ID = "ここに管理者IDを貼り付け"
+ADMIN_USER_ID = "117499766616149841879"
 
 def load_data():
     try:
