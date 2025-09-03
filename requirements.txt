@@ -1,5 +1,6 @@
 Flask
-timezonefinder
-pytz
-google-auth
+google-api-python-client
+google-auth-httplib2
 google-auth-oauthlib
+pytz
+timezonefinder
