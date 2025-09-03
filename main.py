@@ -6,6 +6,10 @@ from timezonefinder import TimezoneFinder
 import pytz
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 import os
 
 app = Flask(__name__)
@@ -13,26 +17,87 @@ app.secret_key = 'a_very_long_and_random_string_that_no_one_can_guess_12345'
 
 CLIENT_ID = "395791546336-ll8vrl97u6iar765t6mg4i7i2ut4d3du.apps.googleusercontent.com"
 
-# data.jsonのパスを/tmpディレクトリに設定
-DATA_FILE_PATH = os.path.join('/tmp', 'data.json')
 tf = TimezoneFinder()
 
 # 管理者のユーザーIDをここに設定してください
-# 一度ログインしてログから取得した'sub'フィールドの値を貼り付けます
 ADMIN_USER_ID = "117499766616149841879"
 
-def load_data():
-    try:
-        # /tmp/data.jsonからデータを読み込む
-        with open(DATA_FILE_PATH, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+# Google Drive APIの設定
+# アプリケーションデータフォルダにアクセスするためのスコープ
+SCOPES = ['https://www.googleapis.com/auth/drive.appdata']
 
-def save_data(data):
-    # /tmp/data.jsonにデータを書き込む
-    with open(DATA_FILE_PATH, 'w') as f:
-        json.dump(data, f, indent=4)
+def get_drive_service():
+    """認証情報を使用してGoogle Driveサービスを構築する"""
+    creds = None
+    # token.json があればそれを読み込む
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    
+    # 認証情報が無効、または有効期限が切れている場合
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # ローカル環境で認証フローを実行し、token.jsonを生成する
+            # Vercelにデプロイする際は、このファイルを含めておく
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # 新しいトークンを保存する
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    
+    return build('drive', 'v3', credentials=creds)
+
+def find_file(drive_service, filename):
+    """Google Driveから指定したファイル名を探す"""
+    query = f"name='{filename}' and 'appDataFolder' in parents and trashed=false"
+    results = drive_service.files().list(
+        q=query,
+        spaces='appDataFolder',
+        fields='files(id, name)'
+    ).execute()
+    files = results.get('files', [])
+    if files:
+        return files[0]
+    return None
+
+def load_data_from_drive(drive_service):
+    """Google Driveからデータを読み込む"""
+    file_info = find_file(drive_service, 'data.json')
+    if file_info:
+        file_id = file_info.get('id')
+        response = drive_service.files().get_media(fileId=file_id).execute()
+        return json.loads(response.decode('utf-8'))
+    return []
+
+def save_data_to_drive(drive_service, data):
+    """Google Driveにデータを保存する"""
+    file_info = find_file(drive_service, 'data.json')
+    
+    # ファイルメタデータ
+    file_metadata = {
+        'name': 'data.json',
+        'parents': ['appDataFolder']
+    }
+    
+    # ファイルの内容
+    media_body = json.dumps(data, indent=4)
+    media = {'body': media_body, 'mimetype': 'application/json'}
+    
+    if file_info:
+        # ファイルが既に存在する場合は更新
+        file_id = file_info.get('id')
+        drive_service.files().update(
+            fileId=file_id,
+            media_body=media
+        ).execute()
+    else:
+        # ファイルが存在しない場合は新規作成
+        drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
 
 def get_local_time(lat, lng):
     timezone_str = tf.timezone_at(lng=lng, lat=lat)
@@ -60,7 +125,6 @@ def login():
     try:
         idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), CLIENT_ID)
         session['user_id'] = idinfo['sub']
-        # デバッグ用: ユーザーIDとメールアドレスをログに出力
         print("Logged in user ID:", idinfo.get('sub'))
         print("Logged in user email:", idinfo.get('email'))
         return jsonify({"success": True})
@@ -80,12 +144,14 @@ def check_login():
 
 @app.route('/locations', methods=['GET', 'POST'])
 def handle_locations():
+    # Google Driveサービスを取得
+    drive_service = get_drive_service()
+    
     if request.method == 'POST':
-        # POSTリクエスト（通報）はログインが必要
         if 'user_id' not in session:
             return jsonify({"error": "Unauthorized"}), 401
             
-        locations = load_data()
+        locations = load_data_from_drive(drive_service)
         data = request.get_json()
         
         data['id'] = str(uuid.uuid4())
@@ -97,30 +163,27 @@ def handle_locations():
         data['timestamp'] = get_local_time(lat, lng)
 
         locations.append(data)
-        save_data(locations)
+        save_data_to_drive(drive_service, locations)
         
         return jsonify(data), 200
 
     elif request.method == 'GET':
-        # GETリクエスト（ピンの取得）は誰でもアクセス可能
-        locations = load_data()
+        locations = load_data_from_drive(drive_service)
         return jsonify(locations), 200
 
 @app.route('/locations/<string:location_id>', methods=['DELETE'])
 def delete_location(location_id):
-    # DELETEリクエスト（削除）はログインが必要
     if 'user_id' not in session:
         return jsonify({"error": "Unauthorized"}), 401
     
-    # 管理者かどうかのチェック
     is_admin = session['user_id'] == ADMIN_USER_ID
 
-    locations = load_data()
+    drive_service = get_drive_service()
+    locations = load_data_from_drive(drive_service)
     
     index_to_delete = -1
     for i, location in enumerate(locations):
         if location.get('id') == location_id:
-            # 管理者の場合は、誰の通報でも削除可能
             if is_admin or location.get('user_id') == session['user_id']:
                 index_to_delete = i
                 break
@@ -129,7 +192,7 @@ def delete_location(location_id):
             
     if index_to_delete != -1:
         del locations[index_to_delete]
-        save_data(locations)
+        save_data_to_drive(drive_service, locations)
         return jsonify({"message": "Location deleted successfully"}), 200
     else:
         return jsonify({"error": "Location not found"}), 404
