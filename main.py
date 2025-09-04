@@ -20,7 +20,7 @@ CLIENT_ID = "395791546336-ll8vrl97u6iar765t6mg4i7i2ut4d3du.apps.googleuserconten
 tf = TimezoneFinder()
 
 # 管理者のユーザーIDをここに設定してください
-ADMIN_USER_ID = "117499766616149841879"
+ADMIN_USER_ID = "ここに管理者IDを貼り付け"
 
 # Google Drive APIの設定
 # アプリケーションデータフォルダにアクセスするためのスコープ
@@ -36,12 +36,10 @@ def get_drive_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # ブラウザを開く代わりに、認証URLをコンソールに出力する
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             auth_url, _ = flow.authorization_url(prompt='consent')
             print(f'ブラウザで以下のURLを開いてください: {auth_url}')
-
-            # ユーザーが認証コードを貼り付けるのを待つ
+            
             auth_code = input('URLから認証コードを貼り付けてEnterを押してください: ')
             flow.fetch_token(code=auth_code)
             creds = flow.credentials
