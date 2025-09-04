@@ -29,20 +29,23 @@ SCOPES = ['https://www.googleapis.com/auth/drive.appdata']
 def get_drive_service():
     """認証情報を使用してGoogle Driveサービスを構築する"""
     creds = None
-    # token.json があればそれを読み込む
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     
-    # 認証情報が無効、または有効期限が切れている場合
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # ローカル環境で認証フローを実行し、token.jsonを生成する
-            # Vercelにデプロイする際は、このファイルを含めておく
+            # ブラウザを開く代わりに、認証URLをコンソールに出力する
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        # 新しいトークンを保存する
+            auth_url, _ = flow.authorization_url(prompt='consent')
+            print(f'ブラウザで以下のURLを開いてください: {auth_url}')
+
+            # ユーザーが認証コードを貼り付けるのを待つ
+            auth_code = input('URLから認証コードを貼り付けてEnterを押してください: ')
+            flow.fetch_token(code=auth_code)
+            creds = flow.credentials
+            
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     
@@ -144,7 +147,6 @@ def check_login():
 
 @app.route('/locations', methods=['GET', 'POST'])
 def handle_locations():
-    # Google Driveサービスを取得
     drive_service = get_drive_service()
     
     if request.method == 'POST':
@@ -198,4 +200,5 @@ def delete_location(location_id):
         return jsonify({"error": "Location not found"}), 404
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=81)
+    app.run(host='0.0.0.0', port=8000)
+
