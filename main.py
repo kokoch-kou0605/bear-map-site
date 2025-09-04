@@ -6,7 +6,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.auth.transport.requests import Request
 
+# Flask アプリ作成
 app = Flask(__name__)
 
 # -------------------------
@@ -16,24 +18,28 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 CREDENTIALS_FILE = "credentials.json"  # Google Cloud から取得した認証情報
 
 def get_drive_service():
+    """Google Drive API サービスを返す"""
     creds = None
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    # 有効な資格情報がない場合はログイン
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
+        # 保存
         with open("token.json", "w") as token:
             token.write(creds.to_json())
     return build("drive", "v3", credentials=creds)
 
+
 # -------------------------
-# Google Drive に保存する関数
+# Google Drive に保存
 # -------------------------
 def save_reports_to_drive(report_data):
-    """report_data を既存の JSON に追記して、Drive にアップロード"""
+    """report_data を reports.json に追記し、Drive にアップロード"""
     local_file = "reports.json"
 
     # 既存データを読み込み
@@ -46,7 +52,7 @@ def save_reports_to_drive(report_data):
     else:
         data = []
 
-    # 新しいデータを追加
+    # 新しい通報を追加
     data.append(report_data)
 
     # ローカルに保存
@@ -56,7 +62,7 @@ def save_reports_to_drive(report_data):
     # Google Drive にアップロード
     service = get_drive_service()
 
-    # 同名ファイルが既にあるか確認
+    # 同名ファイルがあるか確認
     response = service.files().list(q=f"name='{local_file}'", fields="files(id, name)").execute()
     files = response.get("files", [])
 
@@ -66,18 +72,18 @@ def save_reports_to_drive(report_data):
         media = MediaFileUpload(local_file, mimetype="application/json")
         service.files().update(fileId=file_id, media_body=media).execute()
     else:
-        # 新規アップロード
+        # 新規アップロード（マイドライブ直下）
         file_metadata = {"name": local_file, "mimeType": "application/json"}
         media = MediaFileUpload(local_file, mimetype="application/json")
         service.files().create(body=file_metadata, media_body=media, fields="id").execute()
 
 
 # -------------------------
-# ルーティング
+# Flask ルーティング
 # -------------------------
 @app.route("/")
 def index():
-    return render_template("index.html")  # 通報フォームのHTML
+    return render_template("index.html")  # 通報フォーム
 
 @app.route("/report", methods=["POST"])
 def report():
@@ -91,5 +97,8 @@ def report():
     return jsonify({"message": "Report saved successfully!"})
 
 
+# -------------------------
+# メイン
+# -------------------------
 if __name__ == "__main__":
     app.run(debug=True)
