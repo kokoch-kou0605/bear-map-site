@@ -37,12 +37,7 @@ def get_drive_service():
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            print(f'ブラウザで以下のURLを開いてください: {auth_url}')
-            
-            auth_code = input('URLから認証コードを貼り付けてEnterを押してください: ')
-            flow.fetch_token(code=auth_code)
-            creds = flow.credentials
+            creds = flow.run_local_server(port=8000)
             
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
