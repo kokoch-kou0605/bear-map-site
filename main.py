@@ -6,13 +6,15 @@ from timezonefinder import TimezoneFinder
 import pytz
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import os  # 追加
 
 app = Flask(__name__)
 app.secret_key = 'a_very_long_and_random_string_that_no_one_can_guess_12345'
 
 CLIENT_ID = "395791546336-2gegvqd4ion6f3jhvjjvjr1mo79mj295.apps.googleusercontent.com"
 
-DATA_FILE = "data.json"
+# /tmp に data.json を置くよう変更
+DATA_FILE = os.path.join("/tmp", "data.json")
 tf = TimezoneFinder()
 
 def load_data():
@@ -70,7 +72,6 @@ def check_login():
 @app.route('/locations', methods=['GET', 'POST'])
 def handle_locations():
     if request.method == 'POST':
-        # POSTリクエスト（通報）はログインが必要
         if 'user_id' not in session:
             return jsonify({"error": "Unauthorized"}), 401
             
@@ -91,13 +92,11 @@ def handle_locations():
         return jsonify(data), 200
 
     elif request.method == 'GET':
-        # GETリクエスト（ピンの取得）は誰でもアクセス可能
         locations = load_data()
         return jsonify(locations), 200
 
 @app.route('/locations/<string:location_id>', methods=['DELETE'])
 def delete_location(location_id):
-    # DELETEリクエスト（削除）はログインが必要
     if 'user_id' not in session:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -120,6 +119,5 @@ def delete_location(location_id):
         return jsonify({"error": "Location not found"}), 404
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
