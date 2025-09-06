@@ -120,4 +120,6 @@ def delete_location(location_id):
         return jsonify({"error": "Location not found"}), 404
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=81)
+    import os
+    port = int(os.environ.get("PORT", 5000))  # Render が指定するPORTを優先
+    app.run(host="0.0.0.0", port=port)
