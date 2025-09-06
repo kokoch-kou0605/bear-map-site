@@ -1,5 +1,7 @@
-flask
+Flask
+gunicorn
 pytz
 timezonefinder
 google-auth
-gunicorn
+google-auth-oauthlib
+google-auth-httplib2
